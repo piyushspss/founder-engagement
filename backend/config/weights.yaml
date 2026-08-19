@@ -1,0 +1,230 @@
+# Rubric configuration — PLAN.md v2.1 §4.1 / §4.3 / §4.5
+#
+# EVERYTHING IN THIS FILE IS AN ASSUMPTION, NOT A LEARNED PARAMETER.
+# There are no outcome labels in the dataset, so these weights and thresholds are
+# initial operating hypotheses to be tuned against the synthetic safety suite and
+# against Redesign's real weekly review capacity (PLAN §4.5).
+
+version: "1.0.0"
+
+# ---------------------------------------------------------------------------
+# §4.1 Broad-score signal weights. Sum = 100. broad_score = Σ w_i · s_i, s_i ∈ [0,1]
+# ---------------------------------------------------------------------------
+signal_weights:
+  founder_evidence: 25
+  healthcare_depth: 20
+  leadership: 15
+  career_trajectory: 15
+  education_signal: 10
+  operating_environment: 10
+  other: 5
+
+# Normalization parameters per signal (caps / scales stated in PLAN §4.1).
+# "unknown = neutral" values are the score a signal takes when its inputs are
+# absent — never 0-as-penalty unless 0 IS the neutral point for that signal.
+signal_params:
+  founder_evidence:
+    base_explicit: 0.70          # binary component for >=1 EXPLICIT founder title
+    possible_credit: 0.0         # A8: POSSIBLE is never scored as founder evidence
+    tenure_bonus_max: 0.30       # capped tenure bonus on top of the binary base
+    tenure_bonus_full_months: 48 # months of founder tenure earning the full bonus
+    unknown_neutral: 0.0         # no founder evidence observed == absence, not penalty
+
+  healthcare_depth:
+    log_scale_cap_months: 60     # ~5 yrs saturates (PLAN: "log-scaled, cap ~5 yrs")
+    tier_bonus_max: 0.15         # bonus for tiered/premium health employer
+    unknown_neutral: 0.0
+
+  leadership:
+    level_scores:                # from experience[].management_level
+      "C-Level": 1.0
+      "CXO": 1.0
+      "Owner": 0.9
+      "Partner": 0.85
+      "VP": 0.8
+      "Director": 0.65
+      "Head": 0.65
+      # MVP ASSUMPTION (vocabulary coverage from the supplied sample, which uses
+      # "Lead"): "Lead" is real leadership evidence but spans everything from a
+      # senior IC tech lead to a function owner. Placed between Senior (IC
+      # seniority, no reports implied) and Manager (formal people management),
+      # and deliberately far below VP/C-Level. Not tuned to any desired output.
+      "Lead": 0.42
+      "Senior": 0.4
+      "Manager": 0.45
+      "Specialist": 0.2
+      "Entry": 0.1
+      "Training": 0.05
+      "Unpaid": 0.05
+    scope_bonus_max: 0.2         # capped bonus for company size at highest level held
+    scope_full_employees: 1000
+    unknown_neutral: 0.0
+
+  career_trajectory:
+    slope_cap_levels_per_year: 0.5  # level jumps/yr that saturate the signal
+    min_roles: 2                    # fewer roles -> unmeasurable, reported observed=false
+    # A9: Review Priority is the strength of currently OBSERVABLE POSITIVE evidence.
+    # Unmeasurable trajectory is not positive evidence, so it contributes 0.0. It is
+    # still not negative: nothing can push a signal below 0, and `observed=false`
+    # keeps "we could not measure" distinct from "we measured a flat career".
+    unknown_neutral: 0.0
+
+  education_signal:
+    institution_tier_scores:
+      tier_1: 1.0
+      tier_2: 0.7
+      # A7 + A9: an institution we cannot place contributes NO positive evidence.
+      # It is not penalised either — 0.0 is the floor for every signal, so an
+      # unlisted school scores exactly what having no school scores.
+      unknown: 0.0
+    degree_scores:
+      MD: 1.0
+      PhD: 1.0
+      DO: 0.9
+      MBA: 0.7
+      RN: 0.6
+      MS: 0.5
+      BSN: 0.5
+      BS: 0.4
+      BA: 0.4
+      OTHER: 0.0                 # an unrecognised credential is not positive evidence
+    unknown_neutral: 0.0
+
+  operating_environment:
+    log_scale_cap_employees: 5000
+    growth_bonus_max: 0.15
+    growth_full_pct: 30.0
+    revenue_bonus_max: 0.15
+    revenue_full_usd: 50000000
+    # Missing company metadata yields no positive evidence about the operating
+    # environment. Neutral here means "adds nothing", not "counts against".
+    unknown_neutral: 0.0
+
+  other:
+    breadth_full_industries: 3
+    tenure_saturation_start_years: 8
+    tenure_saturation_full_years: 20
+    unknown_neutral: 0.0
+
+# ---------------------------------------------------------------------------
+# §4.3 Confidence = decision-relevant coverage − contradiction − inference penalties
+# ---------------------------------------------------------------------------
+confidence:
+  coverage_weights:
+    experience_history: 30
+    current_role: 10
+    chronology: 15
+    education: 10
+    company_domain_classification: 15
+    founder_evidence: 15
+    other: 5
+  contradiction_penalties:
+    TOTAL_MISMATCH: 0.10
+    OVERLAP: 0.05
+    AMBIGUOUS_CURRENT: 0.05
+    CONFLICTING_IDENTITY_HASHES: 0.10
+    SIZE_RANGE_MISMATCH: 0.05
+    # REORDERED is deliberately absent: it is a QUALITY flag, not a contradiction.
+    # Source-array ordering is a provider formatting artefact the normalizer
+    # repairs deterministically from dates that are themselves consistent.
+  contradiction_penalty_cap: 0.30
+  inference_penalties:
+    INFERRED_DATE: 0.04
+    POSSIBLE_FOUNDER: 0.06
+    FUZZY_INSTITUTION_MATCH: 0.03
+    INFERRED_CURRENT: 0.04
+  inference_penalty_cap: 0.20
+
+# ---------------------------------------------------------------------------
+# §4.5 Safety-policy thresholds. Operating hypotheses, tuned to review capacity.
+# ---------------------------------------------------------------------------
+thresholds:
+  priority_broad: 65            # rule 2
+  priority_confidence: 0.6      # rule 2 / rule 3 boundary
+  low_confidence_floor_broad: 30  # rule 3 lower bound
+  routine_broad: 40             # rule 4
+
+# ---------------------------------------------------------------------------
+# §4.2 Exceptional evidence path (detectors implemented in Checkpoint 4)
+# ---------------------------------------------------------------------------
+exceptional:
+  # exceptional_signal = any STRONG detector, or >= medium_count MEDIUM detectors
+  medium_count: 2
+
+  # CP4: the strength each detector emits WHEN IT FIRES. Config, not code, because
+  # a STRONG signal forces PRIORITY_REVIEW under PLAN §4.5 rule 1 and that is a
+  # product decision. Assumption, not a learned parameter:
+  #   STRONG  — the cue is explicit, rare, and hard to produce by accident.
+  #   MEDIUM  — the cue is real evidence but common enough that ONE of them alone
+  #             should not force a priority review; two independent MEDIUMs do.
+  detector_strengths:
+    repeat_founder: STRONG
+    exit_cue: STRONG
+    rare_domain_expertise: MEDIUM
+    exceptional_progression: MEDIUM
+    major_leadership_scope: MEDIUM
+    exceptional_credential: MEDIUM
+  repeat_founder_min_roles: 2
+  major_leadership_min_employees: 1000
+  major_leadership_levels: ["C-Level", "CXO", "VP", "Owner", "Partner"]
+  # CP4-R1. UNLEARNED MVP ASSUMPTION — reviewer-approved initial rule, not a
+  # calibrated parameter and not chosen to hit any population rate.
+  #
+  # The previous rule (>=2 steps in <=6 years) fired on 55.1% of load_800 and on
+  # the supplied RN's Specialist -> Lead over 5.2 years. That is ordinary
+  # positive progression, which the broad `career_trajectory` signal already
+  # rewards; naming it "exceptional" made the word mean nothing. Exceptional
+  # progression must be materially unusual ACCELERATION, so each rule below
+  # pairs a step count with a window tight enough that meeting it is not routine.
+  #
+  # Steps are the CP3-resolved canonical progression (app/evidence/progression.py),
+  # the same representation the broad signal consumes. A pair satisfies the
+  # detector if it meets ANY rule.
+  exceptional_progression_rules:
+    - min_steps: 3
+      window_years: 6
+    - min_steps: 2
+      window_years: 3
+  exceptional_credential_degrees: ["MD", "PhD", "DO"]
+  # Explicit keyword lists — no inference is permitted (PLAN §4.2)
+  exit_keywords:
+    - "acquired by"
+    - "acquisition by"
+    - "successful exit"
+    - "exited to"
+    - "sold company"
+    - "sold to"
+    - "ipo"
+  rare_domain_specialties:
+    - "genomics"
+    - "radiation oncology"
+    - "medical device regulatory"
+    - "clinical trial design"
+    - "health economics"
+    - "bioinformatics"
+    - "reimbursement strategy"
+    - "cms policy"
+
+# ---------------------------------------------------------------------------
+# Title parsing — A8: founder evidence comes from EXPLICIT titles only
+# ---------------------------------------------------------------------------
+titles:
+  founder_explicit_patterns:
+    - "(?i)\\bco[- ]?founder\\b"
+    - "(?i)\\bfounder\\b"
+    - "(?i)\\bfounding\\s+(ceo|cto|cpo|coo|cmo|engineer|partner|member|team)\\b"
+    - "(?i)\\bfounder\\s*&"
+  # These are LEADERSHIP evidence only. They must never set founder_evidence.
+  leadership_only_patterns:
+    - "(?i)\\bchief\\s+\\w+\\s+officer\\b"
+    - "(?i)\\bceo\\b"
+    - "(?i)\\bpresident\\b"
+    - "(?i)\\bmanaging\\s+director\\b"
+    - "(?i)\\bpartner\\b"
+    - "(?i)\\bowner\\b"
+
+# Fuzzy matching (rapidfuzz) — a match below this score is treated as UNKNOWN,
+# and UNKNOWN is neutral, never negative.
+fuzzy:
+  institution_min_score: 88
+  company_min_score: 90

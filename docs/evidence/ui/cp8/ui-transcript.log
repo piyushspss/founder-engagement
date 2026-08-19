@@ -1,0 +1,34 @@
+SHOT 01-priority-queue-default
+SHOT 02-priority-queue-filtered
+SHOT 03-founder-detail-assessment
+SHOT 04-founder-detail-evidence-provenance
+SHOT 05-founder-detail-human-decision-panel
+--- END-TO-END HUMAN FLOW (all actions performed through the UI) ---
+POST http://localhost:5173/founders/021ceb3f-a1ba-4508-89e1-5f8e2feed1da/decision -> 200
+POST http://localhost:5173/founders/021ceb3f-a1ba-4508-89e1-5f8e2feed1da/stage -> 200
+POST http://localhost:5173/founders/021ceb3f-a1ba-4508-89e1-5f8e2feed1da/stage -> 200
+POST http://localhost:5173/founders/021ceb3f-a1ba-4508-89e1-5f8e2feed1da/stage -> 200
+POST http://localhost:5173/founders/021ceb3f-a1ba-4508-89e1-5f8e2feed1da/stage -> 200
+PATCH http://localhost:5173/founders/021ceb3f-a1ba-4508-89e1-5f8e2feed1da/workflow -> 200
+POST http://localhost:5173/founders/021ceb3f-a1ba-4508-89e1-5f8e2feed1da/notes -> 200
+SHOT 12-end-to-end-final-keep-warm
+SHOT 06-founder-detail-audit-history
+SHOT 10a-unknown-presentation
+SHOT 10b-low-presentation
+SHOT 11-medium-cue-aggregate-false
+SHOT 13-contradictions-and-missing
+SHOT 14-normalized-timeline
+SHOT 15-partial-data-state
+SHOT 07-pipeline-kanban
+SHOT 08-dashboard
+POST http://localhost:5173/founders/021ceb3f-a1ba-4508-89e1-5f8e2feed1da/stage -> 409
+SHOT 16-invalid-transition-409
+SHOT 09-config-drawer
+--- CONFIG / RESCORE DEMO ---
+PUT http://localhost:5173/config -> 200
+SHOT 17-config-saved-not-rescored
+SHOT 18-stale-rubric-indicator
+POST http://localhost:5173/rescore -> 200
+SHOT 19-explicit-recalculate
+SHOT 20-after-recalculate-metadata
+SHOT 21-audit-rescore-vs-human

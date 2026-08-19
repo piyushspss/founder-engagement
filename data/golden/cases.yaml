@@ -1,0 +1,916 @@
+# Golden evaluation set — AUTHORED (Checkpoint 6). PLAN.md v2.3 (FROZEN) §4.5 / §4.6
+#
+# 50 hand-authored cases in four groups. Group totals are the CP1 skeleton's:
+# 15 must_surface · 15 reasonable_low · 10 ambiguous_spiky · 10 data_quality_adversarial.
+#
+# WHAT THIS FILE IS. Every scenario, expectation and rationale below was written
+# BEFORE `scripts/eval.py` was run for the first time, and derived from PLAN
+# v2.3's product semantics — not from assessor output. The SHA-256 of this file
+# and of data/golden/profiles.json is recorded in EVAL_DECISIONS.md under
+# GOLDEN_SET_PRE_EVAL_FREEZE; the first evaluation run was executed only after
+# those hashes were recorded.
+#
+# The CP1 stubs carried expectations written against PLAN v2.1, i.e. before
+# Amendment 2 (incomplete data -> attention floor REVIEW), Amendment 3
+# (confidence < 0.6 -> potential UNKNOWN) and Amendment 4 (LOW requires
+# SUFFICIENT evidence). Every stub expectation that the frozen v2.3 semantics
+# changes is marked `stub_revision:` with the reason. That is authoring, not
+# tuning: it happened before the first run and none of it moved a weight, a
+# threshold or a detector parameter.
+#
+# expected.* uses PLAN §4.5 vocabulary:
+#   attention:   PRIORITY_REVIEW | REVIEW | ROUTINE
+#   potential:   HIGH | MEDIUM | LOW | UNKNOWN
+#   data_state:  SUFFICIENT | PARTIAL | NEEDS_INFORMATION
+#   action:      CONSIDER_ENGAGEMENT | HUMAN_REVIEW | RESEARCH | NO_URGENT_ACTION
+# Single values only. A list would have made a case unfalsifiable, which is the
+# opposite of adversarial validation.
+#
+# expected_evidence.* asserts the SEMANTIC claims the reviewer-approved coverage
+# list is about (detector fired / not fired, founder evidence zero, duplicate
+# relation, contradictions present). These are part of pass/fail.
+#
+# expected_reason lists the assumption / safety-rule IDs the expectation rests
+# on. On failure the no-overfitting protocol applies: (a) implementation
+# violates the rule named here -> fix code; (b) the expectation is wrong ->
+# report, propose, await reviewer approval. Never tune to pass.
+#
+# Rule IDs:
+#   safety_rule_1_exceptional          §4.5 rule 1
+#   safety_rule_2_high_broad_high_conf §4.5 rule 2
+#   safety_rule_3_low_confidence       §4.5 rule 3
+#   safety_rule_4_low_broad_high_conf  §4.5 rule 4
+#   safety_rule_5_needs_information    §4.5 rule 5
+#   safety_rule_else_default_review    §4.5 else branch
+#   guard_4_incomplete_data_floor      v2.2 Amendment 2
+#   guard_5_low_confidence_unknown     v2.2 Amendment 3
+#   guard_6_needs_information_unknown  v2.2 Amendment 3
+#   guard_8_low_requires_sufficient    v2.3 Amendment 4
+#   A6b_conservative_dedup             PLAN A6b
+#   A7_unknown_tier_is_neutral         PLAN A7
+#   A8_explicit_founder_only           PLAN A8
+#   A9_priority_is_attention_not_quality PLAN A9
+#   recall_first_missing_not_negative  PLAN §1 / §4.3
+#   amendment_1_coverage_tracks_evidence v2.2 Amendment 1
+
+version: "2.0.0"
+plan_version: "2.3"
+primary_metric: "recall of must_surface (attention in {PRIORITY_REVIEW, REVIEW}); target >= 0.95; leakage into ROUTINE must be 0"
+caveat: >-
+  This set measures whether the system behaves consistently with the stated MVP
+  assumptions and safety policy under sparse, contradictory and adversarial
+  data. It does NOT estimate accuracy at identifying successful founders; no
+  real founder-outcome labels exist.
+
+cases:
+
+# =========================================================================
+# GROUP 1 — must_surface (15): a human must look at these.
+# =========================================================================
+- id: MS01
+  group: must_surface
+  description: >-
+    Two-time explicit Co-Founder in digital health (Co-Founder & CTO 2016-2019,
+    Co-Founder & CEO 2020-present at different companies), 10y founder tenure,
+    prior Senior PM role, complete profile, MIT B.S.
+  expected: {attention: PRIORITY_REVIEW, potential: HIGH, data_state: SUFFICIENT, action: CONSIDER_ENGAGEMENT}
+  expected_evidence:
+    exceptional_flag: true
+    detectors_fired: [repeat_founder]
+    archetype_matched_includes: [Repeat Founder]
+  rationale: >-
+    Two DISTINCT explicit founder roles at different companies with different
+    start dates is exactly what A8 calls founder evidence and what §4.2 calls a
+    repeat founder, so rule 1 pins attention at PRIORITY_REVIEW. Independently,
+    every scoring dimension is strong and every decision-relevant field is
+    present, so rule 2's two halves both hold and the system is entitled to say
+    HIGH. Nothing is missing and nothing contradicts, so SUFFICIENT. The
+    Repeat Founder archetype must appear among the matches even where a
+    healthcare archetype co-matches (co-matches are preserved, never dropped).
+  expected_reason: [safety_rule_1_exceptional, safety_rule_2_high_broad_high_conf, A8_explicit_founder_only]
+
+- id: MS02
+  group: must_surface
+  description: >-
+    Founder & CEO of a health-services company (2020-present), ONE explicit
+    founder role, preceded by Director of Operations at an 800-person health
+    services group. Complete profile, unlisted-institution MBA.
+  expected: {attention: PRIORITY_REVIEW, potential: HIGH, data_state: SUFFICIENT, action: CONSIDER_ENGAGEMENT}
+  expected_evidence:
+    exceptional_flag: false
+    detectors_not_fired: [repeat_founder]
+  rationale: >-
+    One explicit founder title IS founder evidence (A8) and, combined with deep
+    health tenure and executive scope, carries the broad score past the priority
+    threshold on trusted data — so this founder is high priority through the
+    BROAD policy (rule 2), not through the exceptional path. The repeat-founder
+    detector must stay silent: "impressive" is not "founded twice", and a system
+    that promotes a strong single founder to Repeat Founder would be asserting a
+    fact about the person that the record does not state.
+  expected_reason: [safety_rule_2_high_broad_high_conf, A8_explicit_founder_only, A9_priority_is_attention_not_quality]
+
+- id: MS03
+  group: must_surface
+  description: >-
+    MD who rose Resident (2008) -> Attending (2012) -> Chief Medical Officer
+    (2019) at the same 3000-person health system. Complete profile, MD from a
+    tier-2 medical school.
+  expected: {attention: PRIORITY_REVIEW, potential: HIGH, data_state: SUFFICIENT, action: CONSIDER_ENGAGEMENT}
+  expected_evidence:
+    exceptional_flag: true
+    detectors_fired: [exceptional_credential, major_leadership_scope]
+  rationale: >-
+    Two independent MEDIUM detectors are present — a configured terminal
+    credential (MD) and a C-Level role at a company whose SUPPLIED size clears
+    the major-scope threshold — and §4.2's aggregation rule says two MEDIUMs
+    make the profile exceptional, so rule 1 applies. Separately the broad score
+    clears 65 on complete, non-contradictory data, so rule 2 supplies HIGH and
+    CONSIDER_ENGAGEMENT. The steps are spaced too widely for the progression
+    detector, which is correct: a decade-long clinical rise is not acceleration.
+  expected_reason: [safety_rule_1_exceptional, safety_rule_2_high_broad_high_conf]
+
+- id: MS04
+  group: must_surface
+  description: >-
+    Founder whose experience history is truncated to a SINGLE role (Co-Founder &
+    CEO, 2016-present); the headline states 'acquired by Optum in 2021'.
+    Everything else about the one role is complete.
+  expected: {attention: PRIORITY_REVIEW, potential: UNKNOWN, data_state: NEEDS_INFORMATION, action: RESEARCH}
+  expected_evidence:
+    exceptional_flag: true
+    detectors_fired: [exit_cue]
+    detectors_not_fired: [repeat_founder]
+  rationale: >-
+    Explicit exit wording read verbatim out of a supplied text field is STRONG
+    exceptional evidence, so rule 1 forces PRIORITY_REVIEW. A single role is an
+    incomplete history under I-3', so rule 5 sets NEEDS_INFORMATION and RESEARCH
+    — and guard 6 refuses the HIGH that rule 2's numbers would otherwise
+    support, because strong evidence we have provably not finished reading is
+    still not a claim we are entitled to make. This is the orthogonality the
+    plan is built around: maximum urgency and no quality claim, at once.
+  expected_reason: [safety_rule_1_exceptional, safety_rule_5_needs_information, guard_6_needs_information_unknown, recall_first_missing_not_negative]
+  stub_revision: "CP1 stub allowed potential HIGH/MEDIUM/UNKNOWN; v2.2 guard 6 makes UNKNOWN the only valid value under NEEDS_INFORMATION."
+
+- id: MS05
+  group: must_surface
+  description: >-
+    Founding CTO of a genomics-infrastructure company, PhD in bioinformatics,
+    prior Senior Bioinformatics Scientist. Complete EXCEPT that no location is
+    recorded anywhere on the profile.
+  expected: {attention: PRIORITY_REVIEW, potential: HIGH, data_state: PARTIAL, action: CONSIDER_ENGAGEMENT}
+  expected_evidence:
+    exceptional_flag: true
+  rationale: >-
+    The missing field is location, which feeds one sub-component of the 5-point
+    `other` coverage bucket and nothing decision-relevant, so coverage falls
+    just below 1.0 and the profile is PARTIAL. PLAN v2.3 is explicit that
+    PARTIAL does NOT globally force UNKNOWN: incomplete evidence cannot support
+    a NEGATIVE conclusion, but what was observed was still observed, so a HIGH
+    backed by strong observed positive evidence survives. This case exists to
+    stop the v2.3 amendment being over-read into "any gap voids every claim".
+  expected_reason: [safety_rule_1_exceptional, safety_rule_2_high_broad_high_conf, guard_8_low_requires_sufficient]
+
+- id: MS06
+  group: must_surface
+  description: >-
+    Product Manager -> Director -> VP Product -> Chief Product Officer over 9
+    years at the same 2000-person payer. No founder title. Tier-1 MBA. Complete.
+  expected: {attention: PRIORITY_REVIEW, potential: HIGH, data_state: SUFFICIENT, action: CONSIDER_ENGAGEMENT}
+  expected_evidence:
+    exceptional_flag: false
+    detectors_fired: [major_leadership_scope]
+  rationale: >-
+    Deliberately the case where a founder must surface WITHOUT the exceptional
+    path. Exactly one MEDIUM detector fires (major leadership scope), and the
+    frozen aggregation rule needs two, so the exceptional flag stays false — a
+    single common cue must not be able to force priority, or the word stops
+    meaning anything. The nine-year climb is also too slow for the progression
+    detector. What carries this profile is rule 2 alone: strong evidence on data
+    we trust. If recall depended on the exceptional path this case would fail.
+  expected_reason: [safety_rule_2_high_broad_high_conf, A8_explicit_founder_only]
+  stub_revision: "CP1 stub expected rule 1; one MEDIUM detector is not exceptional under the frozen medium_count=2, so the expectation is rule 2."
+
+- id: MS07
+  group: must_surface
+  description: >-
+    12-year healthcare operator: Operations Analyst (2014) -> Manager -> Director
+    -> VP Operations at a 5200-person hospital network. Clean chronology,
+    complete profile.
+  expected: {attention: PRIORITY_REVIEW, potential: HIGH, data_state: SUFFICIENT, action: CONSIDER_ENGAGEMENT}
+  expected_evidence:
+    exceptional_flag: true
+    detectors_fired: [exceptional_progression, major_leadership_scope]
+  rationale: >-
+    Entry to Manager is three resolved steps inside three years, which meets the
+    tighter of the two configured progression rules, and VP at 5200 employees
+    meets major scope — two MEDIUMs, so rule 1 applies. The broad score also
+    clears 65 on complete data, so rule 2 gives HIGH. Both paths agree here,
+    which is what a clean, strong, fully-legible operator profile should look
+    like.
+  expected_reason: [safety_rule_1_exceptional, safety_rule_2_high_broad_high_conf]
+
+- id: MS08
+  group: must_surface
+  description: >-
+    Co-Founder & CEO whose position_title literally reads '(acquired by Teladoc
+    Health)', now VP Corporate Development at Teladoc. Complete profile.
+  expected: {attention: PRIORITY_REVIEW, potential: HIGH, data_state: SUFFICIENT, action: CONSIDER_ENGAGEMENT}
+  expected_evidence:
+    exceptional_flag: true
+    detectors_fired: [exit_cue]
+  rationale: >-
+    The exit is read verbatim from a supplied field, never inferred from a
+    company disappearing or a title changing — that is the whole discipline of
+    the detector, and this case is the positive control for it. Founder tenure,
+    health depth and a tier-1 employer carry the broad score past 65 on complete
+    data, so rule 2 also holds. Note the trajectory signal correctly asserts
+    NOTHING for CEO -> VP: the roles are not the same job family, so the
+    conflict is unresolvable and no regression is claimed.
+  expected_reason: [safety_rule_1_exceptional, safety_rule_2_high_broad_high_conf, A8_explicit_founder_only]
+
+- id: MS09
+  group: must_surface
+  description: >-
+    Two distinct explicit founder roles (2013-2018, 2019-present), but company
+    metadata is entirely absent — no industry, no size, no revenue — plus no
+    education, no stated total, no location and no currentness indicator.
+  expected: {attention: PRIORITY_REVIEW, potential: UNKNOWN, data_state: PARTIAL, action: HUMAN_REVIEW}
+  expected_evidence:
+    exceptional_flag: true
+    detectors_fired: [repeat_founder]
+    detectors_not_fired: [major_leadership_scope]
+  rationale: >-
+    The exceptional-and-untrusted corner. Repeat-founder evidence is fully
+    legible from the titles, so rule 1 fires and attention is PRIORITY_REVIEW no
+    matter what else is missing. But more than a third of decision-relevant
+    coverage is gone, so confidence lands below 0.6 and guard 5 refuses to
+    assert any quality band: UNKNOWN. Missing company size must ALSO keep the
+    major-scope detector silent — a threshold about a number the record states
+    cannot be met by a number the record omits.
+  expected_reason: [safety_rule_1_exceptional, safety_rule_3_low_confidence, guard_5_low_confidence_unknown, guard_4_incomplete_data_floor, recall_first_missing_not_negative]
+
+- id: MS10
+  group: must_surface
+  description: >-
+    Engineer -> Engineer II -> Senior Engineer -> Engineering Lead over exactly
+    6 years at a 300-person health-tech company, spaced two years apart so that
+    only the '>=3 steps in <=6 years' rule can match. Complete profile.
+  expected: {attention: REVIEW, potential: MEDIUM, data_state: SUFFICIENT, action: HUMAN_REVIEW}
+  expected_evidence:
+    exceptional_flag: false
+    detectors_fired: [exceptional_progression]
+  rationale: >-
+    Authored to isolate the second configured progression rule: three resolved
+    steps inside six years, with every intermediate pair too slow for the
+    '>=2 steps in <=3 years' rule. The detector must fire at MEDIUM. It is the
+    only MEDIUM, so the aggregate exceptional flag stays false, and the broad
+    score sits in the middle band — which is precisely the 'else' row: no rule
+    speaks for this person, so a human looks. Surfacing is what matters here,
+    not priority.
+  expected_reason: [safety_rule_else_default_review]
+  stub_revision: "CP1 stub expected PRIORITY_REVIEW via rule 1; a single MEDIUM detector does not set the exceptional flag under frozen config."
+
+- id: MS11
+  group: must_surface
+  description: >-
+    Registered Nurse (2012) -> Clinical Operations Lead -> Director of Clinical
+    Operations, 14 years entirely inside health systems. BSN. No founder
+    history. Complete profile.
+  expected: {attention: REVIEW, potential: MEDIUM, data_state: SUFFICIENT, action: HUMAN_REVIEW}
+  expected_evidence:
+    exceptional_flag: false
+    archetype_matched_includes: [Clinical Expert]
+  rationale: >-
+    The deep domain expert with no founder history. Nothing here is exceptional
+    under the frozen detectors, and the broad score does not reach 65 — largely
+    because a quarter of the rubric is founder evidence this person has none of.
+    The system must NOT silently conclude LOW: the observable evidence is real
+    and substantial, so the correct output is a human look, and the archetype
+    layer must frame them by the clinical path they actually have rather than
+    against a single tech-founder template.
+  expected_reason: [safety_rule_else_default_review, A9_priority_is_attention_not_quality]
+
+- id: MS12
+  group: must_surface
+  description: >-
+    Founder & CEO with two prior health-operating roles, but EVERY date field is
+    null across all three roles, no currentness indicator anywhere, and no
+    stated total experience. Titles, levels, durations, industries and sizes
+    are all present.
+  expected: {attention: REVIEW, potential: UNKNOWN, data_state: PARTIAL, action: HUMAN_REVIEW}
+  expected_evidence:
+    exceptional_flag: false
+  rationale: >-
+    Founder evidence survives the loss of chronology (titles are intact), so the
+    broad score stays high — but chronology and currentness are two whole
+    coverage components, and three unresolvable currentness contradictions cost
+    more on top, dragging confidence below 0.6. That is rule 3 exactly: strong
+    apparent evidence we do not trust enough to make a claim about, so REVIEW
+    and UNKNOWN. The history itself is present and multi-role, so this is
+    PARTIAL, not NEEDS_INFORMATION — 'missing history' is a statement about
+    role count (I-3'), not about missing fields in general.
+  expected_reason: [safety_rule_3_low_confidence, guard_5_low_confidence_unknown, guard_4_incomplete_data_floor]
+  stub_revision: "CP1 stub said PRIORITY_REVIEW / NEEDS_INFORMATION; under I-3' a three-role history is not a missing history, and no exceptional detector fires here."
+
+- id: MS13
+  group: must_surface
+  description: >-
+    PhD from a tier-1 school, Research Scientist -> Principal Scientist,
+    Genomics at a 1200-person biotech, 10 years. Complete profile.
+  expected: {attention: PRIORITY_REVIEW, potential: MEDIUM, data_state: SUFFICIENT, action: HUMAN_REVIEW}
+  expected_evidence:
+    exceptional_flag: true
+    detectors_fired: [rare_domain_expertise, exceptional_credential]
+  rationale: >-
+    A configured rare specialty appearing verbatim plus a terminal credential is
+    two MEDIUMs, so rule 1 forces PRIORITY_REVIEW. But the broad score does not
+    reach 65, and rule 1 speaks ONLY about attention — it deliberately makes no
+    claim about founder potential. The expected output is therefore the
+    deliberately uncomfortable pair PRIORITY_REVIEW + MEDIUM: see something
+    rare, look at it, without the machine pretending to have concluded anything
+    about quality. Exceptional evidence must never manufacture HIGH.
+  expected_reason: [safety_rule_1_exceptional, safety_rule_else_default_review, A9_priority_is_attention_not_quality]
+
+- id: MS14
+  group: must_surface
+  description: >-
+    Co-Founder & COO of a fintech company (2019-present) with 5 years of prior
+    health operating experience as an Operations Manager. Complete profile.
+  expected: {attention: PRIORITY_REVIEW, potential: HIGH, data_state: SUFFICIENT, action: CONSIDER_ENGAGEMENT}
+  expected_evidence:
+    exceptional_flag: false
+    detectors_not_fired: [repeat_founder]
+  rationale: >-
+    Founder evidence is domain-independent under A8 — the title is explicit and
+    the company being fintech does not make it less of a founding. Five years of
+    health operating experience saturates the healthcare signal, so the broad
+    score clears 65 on complete data and rule 2 applies. One founder role, so no
+    repeat-founder claim.
+  expected_reason: [safety_rule_2_high_broad_high_conf, A8_explicit_founder_only]
+
+- id: MS15
+  group: must_surface
+  description: >-
+    Account Executive (2015) -> Director of Sales -> VP Sales at a 1500-person
+    health insurer, 11 years. Tier-2 MBA. Complete profile.
+  expected: {attention: PRIORITY_REVIEW, potential: HIGH, data_state: SUFFICIENT, action: CONSIDER_ENGAGEMENT}
+  expected_evidence:
+    exceptional_flag: true
+    detectors_fired: [exceptional_progression, major_leadership_scope]
+  rationale: >-
+    Commercial leadership is a legitimate founder profile for a venture studio,
+    and the rubric must not treat 'not technical, not clinical' as weak. Three
+    resolved steps in four years meets a progression rule and VP at 1500
+    employees meets major scope, so rule 1 fires; the broad score also clears 65
+    on complete data, so rule 2 gives HIGH.
+  expected_reason: [safety_rule_1_exceptional, safety_rule_2_high_broad_high_conf]
+
+# =========================================================================
+# GROUP 2 — reasonable_low (15): defensible to leave un-prioritised.
+# ROUTINE never means hidden (PLAN §4.5 rule 4) and, since v2.3, LOW is a
+# CONCLUSION that requires SUFFICIENT evidence — so every profile in this
+# group is deliberately COMPLETE. A LOW we are not entitled to make is a
+# failure of this group, not a pass.
+# =========================================================================
+- id: RL01
+  group: reasonable_low
+  description: "Operations Assistant -> Operations Analyst, 3y at a 45-person freight firm. Entry level throughout. Complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  rationale: >-
+    Every decision-relevant field is present and internally consistent, so the
+    system genuinely had enough to assess this person; what it found was weak
+    across every dimension — no founder evidence, no health exposure, no
+    leadership, no scope. That is the exact product definition of LOW under
+    v2.3: sufficient evidence, trusted, weak. The founder stays visible in the
+    queue; ROUTINE is a statement about priority, not about hiding them.
+  expected_reason: [safety_rule_4_low_broad_high_conf]
+
+- id: RL02
+  group: reasonable_low
+  description: "Store Manager at two 80-person retailers, 7y, Manager level throughout, no progression. Complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  rationale: >-
+    Real people-management responsibility, in an unrelated domain, at small
+    scale, with a flat level history. Leadership evidence contributes what it is
+    worth and nothing else does; the total stays well below the routine
+    threshold on complete data.
+  expected_reason: [safety_rule_4_low_broad_high_conf]
+
+- id: RL03
+  group: reasonable_low
+  description: "Recent graduate: Marketing Intern -> Marketing Coordinator at a 60-person agency, complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  rationale: >-
+    Two years of career, no health, no founding, no scope. The data is complete,
+    so LOW is a conclusion the system is entitled to state rather than a default
+    it fell back to.
+  expected_reason: [safety_rule_4_low_broad_high_conf]
+
+- id: RL04
+  group: reasonable_low
+  description: "Individual-contributor Staff Accountant, 7y across two 300-person firms, Specialist level, no progression."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  rationale: >-
+    A long, legible, entirely flat individual-contributor career outside health.
+    Complete data, weak observable evidence for a venture-building context.
+  expected_reason: [safety_rule_4_low_broad_high_conf]
+
+- id: RL05
+  group: reasonable_low
+  description: "Customer Support Associate -> Specialist, 5y at one 120-person software company. Complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  rationale: >-
+    One ordinary promotion over three years is measurable positive trajectory
+    and is scored as such, but it is a small share of a rubric on which nothing
+    else registers. Complete data, weak evidence.
+  expected_reason: [safety_rule_4_low_broad_high_conf]
+
+- id: RL06
+  group: reasonable_low
+  description: "Junior -> Software Engineer, 2y at a 140-person non-health SaaS company, unlisted institution. Complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  rationale: >-
+    Also a control for A7: the unlisted school contributes zero positive
+    evidence and is NOT penalised, and the profile is not PARTIAL because of it
+    — an institution we can read is available evidence even when our starter
+    tier list does not recognise it. Confidence must not become a measure of how
+    long our list is.
+  expected_reason: [safety_rule_4_low_broad_high_conf, A7_unknown_tier_is_neutral]
+
+- id: RL07
+  group: reasonable_low
+  description: "Administrative Assistant -> Senior Administrative Assistant, 7y at a 240-person community hospital. Complete profile."
+  expected: {attention: REVIEW, potential: MEDIUM, data_state: SUFFICIENT, action: HUMAN_REVIEW}
+  rationale: >-
+    Authored as an escalation the rubric SHOULD produce and a human should
+    argue with. Seven years inside a healthcare employer saturates the 20-point
+    healthcare_depth signal regardless of role scope, and with an ordinary
+    promotion and mid-size employer scope on top, the score lands in the middle
+    band where no rule speaks and the 'else' row sends it to a person. That is
+    consistent with the frozen semantics — healthcare_depth measures exposure,
+    not seniority — and it is exactly the kind of queue-load fact §7 of the CP6
+    brief asks to be reported rather than tuned away.
+  expected_reason: [safety_rule_else_default_review]
+  stub_revision: "CP1 stub allowed ROUTINE or REVIEW; authored as the determinate REVIEW so the case can actually fail."
+
+- id: RL08
+  group: reasonable_low
+  description: >-
+    Graphic Designer, 8y at two design studios. Industry string 'Graphic Design'
+    is PRESENT on both roles but is in neither the health nor the non-health
+    taxonomy; management_level is recorded nowhere. Everything else complete.
+  expected: {attention: REVIEW, potential: UNKNOWN, data_state: PARTIAL, action: HUMAN_REVIEW}
+  expected_evidence:
+    quality_flags_include: [UNKNOWN_INDUSTRY, MISSING_MANAGEMENT_LEVEL]
+    signals_zero: [healthcare_depth, leadership]
+  rationale: >-
+    Two things at once. (A) An industry we do not recognise must classify as
+    UNKNOWN, not as known-non-health: it yields zero healthcare evidence
+    (identical to NO) but it reduces company/domain coverage, because we did not
+    actually classify anything. (Q) The result is a PARTIAL profile whose
+    observable evidence is weak — and v2.3 forbids concluding LOW there. The
+    missing part is exactly where positive evidence would have been, so the
+    honest output is 'we do not know' plus a human look, never a negative
+    verdict. This is the case that would silently become ROUTINE/LOW under v2.1.
+  expected_reason: [A7_unknown_tier_is_neutral, amendment_1_coverage_tracks_evidence, guard_4_incomplete_data_floor, guard_8_low_requires_sufficient, recall_first_missing_not_negative]
+  stub_revision: "CP1 stub allowed ROUTINE/LOW; v2.3 Amendment 4 makes UNKNOWN the only valid potential for PARTIAL + weak evidence."
+
+- id: RL09
+  group: reasonable_low
+  description: "Warehouse Supervisor at two 110-person distributors, 9y, Manager level throughout. Complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  rationale: "Complete, legible, flat, non-health, small scope: a LOW the system is entitled to state."
+  expected_reason: [safety_rule_4_low_broad_high_conf]
+
+- id: RL10
+  group: reasonable_low
+  description: "Elementary -> Middle School Teacher, 10y in one K-12 district, M.S. Education. Complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  rationale: >-
+    A recognised master's credential contributes real education evidence and is
+    still nowhere near enough on its own — credentials are one 10-point signal,
+    not a shortcut past the rest of the rubric.
+  expected_reason: [safety_rule_4_low_broad_high_conf]
+
+- id: RL11
+  group: reasonable_low
+  description: "Bank Teller (2019) -> Personal Banker (2023) at a 900-person bank, 7y. Complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  expected_evidence:
+    detectors_not_fired: [exceptional_progression]
+    signals_positive: [career_trajectory]
+  rationale: >-
+    The ordinary-promotion control. ONE resolved step over four years must
+    produce genuinely positive broad trajectory evidence — the signal is a slope
+    and this slope is positive — while the exceptional-progression detector
+    stays silent, because 'the career went up' is not acceleration. If ordinary
+    promotion could fire the detector, the exceptional path would flood the
+    queue and the word would stop discriminating.
+  expected_reason: [safety_rule_4_low_broad_high_conf]
+
+- id: RL12
+  group: reasonable_low
+  description: "Field Sales Representative at two 35-person wholesalers, 4y, Entry level. Complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  rationale: "Complete data, entry-level scope, unrelated domain: weak on every dimension the rubric measures."
+  expected_reason: [safety_rule_4_low_broad_high_conf]
+
+- id: RL13
+  group: reasonable_low
+  description: "Restaurant General Manager at two 150-person operators, 12y, Manager level throughout."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  rationale: >-
+    Long tenure is explicitly saturating in the rubric (§4.1 'other'): 12 years
+    of the same job is not three times better than four, and the saturating
+    curve is why long-but-flat careers cannot accumulate their way into the
+    queue.
+  expected_reason: [safety_rule_4_low_broad_high_conf]
+
+- id: RL14
+  group: reasonable_low
+  description: "IT Support Specialist, 5y at a 240-person community hospital, Specialist level, no progression. Complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  rationale: >-
+    The companion to RL07 and the reason both are worth having. Same employer
+    type and same health exposure, but no progression step at all — which is the
+    difference between landing in the middle band and staying below the routine
+    threshold. Authored as ROUTINE/LOW because the data is complete and every
+    positive dimension except health exposure is empty; if it lands in REVIEW
+    instead, the honest reading is that healthcare_depth alone dominates the
+    band boundary, and that is a finding to report, not a threshold to move.
+  expected_reason: [safety_rule_4_low_broad_high_conf]
+  stub_revision: "CP1 stub allowed ROUTINE or REVIEW; authored as the determinate ROUTINE so the case can actually fail."
+
+- id: RL15
+  group: reasonable_low
+  description: "Paralegal at two 180-person law firms, 7y, Specialist level, unlisted institution. Complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  expected_evidence:
+    signals_positive: [education_signal]
+  rationale: >-
+    The other half of the A7 control (see AS05). The unlisted school itself
+    contributes ZERO, but the recognised bachelor's credential still contributes
+    what a bachelor's is worth — education_signal is max(institution, degree),
+    so 'we do not know the school' never erases 'we can read the degree'.
+  expected_reason: [safety_rule_4_low_broad_high_conf, A7_unknown_tier_is_neutral]
+
+# =========================================================================
+# GROUP 3 — ambiguous_spiky (10): the cases the rubric is worst at.
+# =========================================================================
+- id: AS01
+  group: ambiguous_spiky
+  description: >-
+    Three Senior Engineer roles in four years at three different tiny startups
+    (8/12/20 employees), flat level, and the current role carries no currentness
+    indicator at all.
+  expected: {attention: REVIEW, potential: UNKNOWN, data_state: PARTIAL, action: HUMAN_REVIEW}
+  rationale: >-
+    Spiky builder or serial churn — the machine has no basis to decide, and
+    should not pretend to. The missing currentness costs a whole coverage
+    component and adds an unresolvable contradiction, so the profile is PARTIAL;
+    the observable evidence is weak, and under v2.3 a PARTIAL profile with weak
+    evidence yields UNKNOWN and a human look rather than a negative verdict.
+  expected_reason: [guard_4_incomplete_data_floor, guard_8_low_requires_sufficient, recall_first_missing_not_negative]
+
+- id: AS02
+  group: ambiguous_spiky
+  description: >-
+    Operations Analyst -> Manager -> VP Operations in three years at a 700-person
+    health group (2008-2011), then a NINE-YEAR gap, then Marketing Coordinator
+    at a media agency from 2021. Complete fields throughout.
+  expected: {attention: REVIEW, potential: MEDIUM, data_state: SUFFICIENT, action: HUMAN_REVIEW}
+  expected_evidence:
+    exceptional_flag: false
+    detectors_fired: [exceptional_progression]
+  rationale: >-
+    The pairwise-semantics case. Read end to end, this career is noise: the
+    first and last roles are both Entry, and the post-gap pairs are provider
+    regressions across unrelated job families that the canonical resolution
+    correctly refuses to interpret at all. But ONE role pair inside it —
+    Entry to VP in three years — is independently well supported and meets a
+    progression rule, and a real acceleration must not be erased by unrelated
+    noise elsewhere in the CV. So the detector fires (one MEDIUM, hence no
+    exceptional flag) while the broad trajectory signal, which reads first-to-
+    last, correctly reports nothing. Both are right; they answer different
+    questions.
+  expected_reason: [safety_rule_else_default_review]
+  stub_revision: "CP1 stub expected PARTIAL/NEEDS_INFORMATION; the frozen coverage model has no gap detector, so a gap with complete fields is SUFFICIENT. Reported as an oddity rather than patched."
+
+- id: AS03
+  group: ambiguous_spiky
+  description: >-
+    Headline reads 'Founder & builder | health tech' but no experience entry
+    carries an explicit founder title (Head of Growth, Growth Manager).
+  expected: {attention: REVIEW, potential: MEDIUM, data_state: SUFFICIENT, action: HUMAN_REVIEW}
+  expected_evidence:
+    signals_zero: [founder_evidence]
+    inferences_include: [POSSIBLE_FOUNDER]
+  rationale: >-
+    A8 in its purest form: a headline is self-reported and unverifiable against
+    any company, so it can raise a suspicion and nothing else. founder_evidence
+    must be exactly zero — POSSIBLE is scored 0.0 by config — and the suspicion
+    is priced as an inference penalty against confidence, not as evidence for
+    the founder. The person still surfaces, on their real operating evidence.
+  expected_reason: [A8_explicit_founder_only, safety_rule_else_default_review]
+  stub_revision: "CP1 stub expected PARTIAL/NEEDS_INFORMATION; the profile's fields are complete, and an inference penalty lowers confidence without lowering coverage."
+
+- id: AS04
+  group: ambiguous_spiky
+  description: >-
+    18 years at one medical-device company: Quality Engineer (Specialist) ->
+    Regulatory Affairs Lead (Lead), department Operations throughout. Complete.
+  expected: {attention: REVIEW, potential: MEDIUM, data_state: SUFFICIENT, action: HUMAN_REVIEW}
+  expected_evidence:
+    archetype_primary_not: Healthcare Operator
+  rationale: >-
+    The 'Lead' case. Lead is genuine leadership evidence and is scored as such —
+    it is not treated as an absence — but it sits below Manager on the canonical
+    ordering, so it must NOT satisfy the Healthcare Operator archetype's
+    Manager-or-above gate. Scoring credit and gate satisfaction are different
+    questions, and conflating them would let a senior IC be labelled as running
+    an organisation. The deep single-domain profile itself is genuinely
+    ambiguous and goes to a human.
+  expected_reason: [safety_rule_else_default_review]
+
+- id: AS05
+  group: ambiguous_spiky
+  description: >-
+    PhD from an unlisted institution, Medical Physicist -> Senior Medical
+    Physicist, Radiation Oncology at a 400-person cancer institute, 11y.
+  expected: {attention: PRIORITY_REVIEW, potential: MEDIUM, data_state: SUFFICIENT, action: HUMAN_REVIEW}
+  expected_evidence:
+    exceptional_flag: true
+    detectors_fired: [exceptional_credential, rare_domain_expertise]
+  rationale: >-
+    The institution is unknown to our starter list and therefore contributes
+    zero positive evidence — but the PhD is a credential we can read, so
+    education_signal is carried by the degree, and the credential detector fires
+    on the degree without ever consulting the tier list. With a configured rare
+    specialty appearing verbatim, that is two MEDIUMs and rule 1 applies. Prestige
+    plays no part in either half of this; recognisability of the CREDENTIAL does.
+  expected_reason: [safety_rule_1_exceptional, A7_unknown_tier_is_neutral]
+
+- id: AS06
+  group: ambiguous_spiky
+  description: >-
+    Operations Associate (Entry, 2022) -> Director of Operations (2025) at a
+    12-person company: four resolved level steps in exactly three years.
+    Complete profile.
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  expected_evidence:
+    exceptional_flag: false
+    detectors_fired: [exceptional_progression]
+  rationale: >-
+    Authored to isolate the tighter progression rule (>=2 steps in <=3 years),
+    which must fire at MEDIUM. What follows from the frozen policy is
+    deliberately uncomfortable and is the point of the case: one MEDIUM is not
+    exceptional, and at a 12-person company with no health exposure, no founder
+    evidence and no scope, the rest of the rubric is close to empty, so the
+    profile lands below the routine threshold on complete data. Small-pond title
+    inflation is exactly what the rubric declines to chase, and the founder stays
+    visible in the queue. If this feels wrong, the lever is the reviewer-owned
+    medium_count / threshold question, not this case.
+  expected_reason: [safety_rule_4_low_broad_high_conf]
+  stub_revision: "CP1 stub expected PRIORITY_REVIEW or REVIEW; under frozen config a single MEDIUM detector cannot raise attention and the broad score is well under 40."
+
+- id: AS07
+  group: ambiguous_spiky
+  description: >-
+    Registered Nurse (2012-2018) -> Product Manager (2019-2023) -> Senior Product
+    Manager (2024-), where the provider's management_level goes Manager ->
+    Senior, i.e. it reports the promotion as a REGRESSION.
+  expected: {attention: REVIEW, potential: MEDIUM, data_state: SUFFICIENT, action: HUMAN_REVIEW}
+  expected_evidence:
+    exceptional_flag: false
+    detectors_not_fired: [exceptional_progression]
+    signals_positive: [career_trajectory]
+  rationale: >-
+    The provider taxonomy conflates IC seniority with people management, so a
+    real same-family promotion arrives looking like a demotion. The canonical
+    resolution must re-read it against the titles and assert a POSITIVE step —
+    asserting the regression would be a factual error about the person. And the
+    resolved result must not be flattered either: one step in five years is
+    ordinary, so the exceptional-progression detector stays silent. Positive but
+    not exceptional is the whole content of this case.
+  expected_reason: [safety_rule_else_default_review]
+
+- id: AS08
+  group: ambiguous_spiky
+  description: "'Founding Member' of a nonprofit (2019-2023) -> Program Manager at a community services org. Complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  expected_evidence:
+    signals_zero: [founder_evidence]
+  rationale: >-
+    'Founding Member' is checked BEFORE the broad founder patterns precisely so
+    it cannot be swallowed by them: it is POSSIBLE, and POSSIBLE is scored 0.0,
+    because being early at an organisation is not founding a company. With that
+    correctly at zero, the rest of the profile is an ordinary nonprofit
+    management career on complete data, and LOW is a conclusion the system is
+    entitled to state.
+  expected_reason: [A8_explicit_founder_only, safety_rule_4_low_broad_high_conf]
+  stub_revision: "CP1 stub expected REVIEW; with founder evidence correctly at zero the remaining evidence is weak and the data is complete."
+
+- id: AS09
+  group: ambiguous_spiky
+  description: >-
+    Senior Engineer (2016) -> Co-Founder & CEO (2021), with NO industry, NO
+    company size, NO education, NO stated total, NO location and no currentness
+    indicator. Titles, levels and dates are intact.
+  expected: {attention: REVIEW, potential: UNKNOWN, data_state: PARTIAL, action: HUMAN_REVIEW}
+  expected_evidence:
+    exceptional_flag: false
+  rationale: >-
+    The rule-3 shape that the synthetic load population never produced (CP5
+    finding F-3), authored deliberately: a broad score far above 30 built almost
+    entirely from titles and levels, against coverage below 0.6. Rule 3 is the
+    only rule that fires, and it is the most important one in the policy —
+    'we can see a lot and trust little' must mean a human look and NO quality
+    claim, not a confident verdict in either direction.
+  expected_reason: [safety_rule_3_low_confidence, guard_5_low_confidence_unknown, guard_4_incomplete_data_floor]
+
+- id: AS10
+  group: ambiguous_spiky
+  description: >-
+    Five concurrent advisory roles (2022-present), three of which carry no
+    company size, one short health advisory role, no operating role at all.
+  expected: {attention: REVIEW, potential: UNKNOWN, data_state: PARTIAL, action: HUMAN_REVIEW}
+  expected_evidence:
+    contradictions_include: [OVERLAP]
+  rationale: >-
+    Concurrent roles are reported, never resolved: overlap is often legitimate
+    (advisory work, a founder with a day job), so it costs confidence and asks a
+    human, rather than being silently reconciled. With missing company sizes
+    reducing coverage too, this is PARTIAL with weak observable evidence, which
+    v2.3 requires to be UNKNOWN rather than LOW.
+  expected_reason: [guard_4_incomplete_data_floor, guard_8_low_requires_sufficient]
+
+# =========================================================================
+# GROUP 4 — data_quality_adversarial (10): the system must not be fooled,
+# and must not punish a founder for the data being bad.
+# =========================================================================
+- id: DQ01
+  group: data_quality_adversarial
+  description: >-
+    Clinical Program Specialist -> Manager, 10y at a 600-person health system.
+    A second record in the corpus shares exactly ONE strong identity hash.
+  expected: {attention: REVIEW, potential: MEDIUM, data_state: SUFFICIENT, action: HUMAN_REVIEW}
+  expected_evidence:
+    duplicate_relation: PROBABLE
+  rationale: >-
+    A6b: one strong hash match is a PROBABLE duplicate — flagged for a human,
+    never auto-merged, and both records remain independently assessable. The
+    duplicate flag is a QUALITY observation, so it must not move confidence or
+    any dimension: the person's own evidence decides their assessment.
+  expected_reason: [A6b_conservative_dedup, safety_rule_else_default_review]
+
+- id: DQ02
+  group: data_quality_adversarial
+  description: >-
+    Facilities Assistant -> Coordinator, 8y at a 70-person property group. A
+    second record shares THREE strong identity hashes.
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  expected_evidence:
+    duplicate_relation: HIGH_CONFIDENCE
+  rationale: >-
+    Even a high-confidence duplicate is flagged and NOT merged in the MVP —
+    merging is how a good founder's evidence gets lost. The assessment must be
+    identical to what the same profile would receive with no duplicate at all:
+    a complete, weak, non-health record, which is a LOW the system is entitled
+    to state.
+  expected_reason: [A6b_conservative_dedup, safety_rule_4_low_broad_high_conf]
+
+- id: DQ03
+  group: data_quality_adversarial
+  description: >-
+    Logistics Coordinator, 8y. A second record shares the NAME hash but has
+    different linkedin and email hashes.
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  expected_evidence:
+    duplicate_relation: NEVER
+    contradictions_include: [CONFLICTING_IDENTITY_HASHES]
+  rationale: >-
+    Conflicting strong hashes must NEVER produce a duplicate assertion — two
+    different people can share a name. The identity data disagreeing with itself
+    is a contradiction, so it costs confidence; but it stays well above the
+    operating threshold, and the profile's own complete evidence still supports
+    the LOW conclusion.
+  expected_reason: [A6b_conservative_dedup, safety_rule_4_low_broad_high_conf]
+
+- id: DQ04
+  group: data_quality_adversarial
+  description: >-
+    Clinical Operations Specialist -> Manager at a 4200-person health system,
+    complete in every field, but total_experience_duration_months is 42 months
+    larger than the roles imply AND company_employees_count (4200) falls outside
+    the supplied company_size_range ('201-500 employees').
+  expected: {attention: REVIEW, potential: MEDIUM, data_state: SUFFICIENT, action: HUMAN_REVIEW}
+  expected_evidence:
+    contradictions_include: [TOTAL_MISMATCH, SIZE_RANGE_MISMATCH]
+  rationale: >-
+    T: a record can be COMPLETE and still disagree with itself. data_state reads
+    coverage — the availability of decision-relevant evidence — and every field
+    is available, so it stays SUFFICIENT; confidence, which is where data
+    quality enters the maths, falls by both contradiction penalties. D: the
+    exact employee count is retained as canonical (a stated fact) while the
+    range mismatch is flagged, and neither raw value is overwritten, averaged or
+    silently reconciled.
+  expected_reason: [safety_rule_else_default_review]
+  stub_revision: "CP1 stub expected PARTIAL/NEEDS_INFORMATION; under the frozen ladder contradictions lower confidence but do not reduce coverage, so SUFFICIENT is correct."
+
+- id: DQ05
+  group: data_quality_adversarial
+  description: "President -> Chief Executive Officer of a 9-to-14-person freight company, 16y, never a founder. Complete profile."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  expected_evidence:
+    signals_zero: [founder_evidence]
+    detectors_not_fired: [repeat_founder, major_leadership_scope]
+  rationale: >-
+    J: CEO and President are LEADERSHIP evidence and nothing more (A8). The
+    leadership signal is paid in full — this person really does run a company —
+    but founder_evidence stays at exactly zero, and repeat_founder cannot fire
+    at any company size. Major leadership scope is also correctly silent: a
+    C-Level title at 14 employees is not major scope. With a quarter of the
+    rubric legitimately empty and no health exposure, the complete record
+    supports LOW.
+  expected_reason: [A8_explicit_founder_only, safety_rule_4_low_broad_high_conf]
+
+- id: DQ06
+  group: data_quality_adversarial
+  description: "Harvard B.A., empty experience array, headline only."
+  expected: {attention: REVIEW, potential: UNKNOWN, data_state: NEEDS_INFORMATION, action: RESEARCH}
+  expected_evidence:
+    exceptional_flag: false
+    detectors_not_fired: [exceptional_credential]
+  rationale: >-
+    U: prestige alone must never produce an exceptional signal. The credential
+    detector reads the DEGREE and deliberately never consults the tier list, so
+    a tier-1 school with an ordinary bachelor's contributes education points and
+    no exceptional evidence. With no experience at all this is
+    NEEDS_INFORMATION and RESEARCH, potential UNKNOWN — and the attention floor
+    keeps it out of ROUTINE, because a profile we have not begun to read cannot
+    earn the positive assertion that we are comfortable not prioritising it.
+  expected_reason: [safety_rule_5_needs_information, guard_6_needs_information_unknown, guard_4_incomplete_data_floor]
+  stub_revision: "CP1 stub allowed ROUTINE; v2.2 Amendment 2 makes ROUTINE + NEEDS_INFORMATION unreachable."
+
+- id: DQ07
+  group: data_quality_adversarial
+  description: "Empty experience array; M.S. Health Administration from an unlisted school and a headline claiming healthcare operations leadership."
+  expected: {attention: REVIEW, potential: UNKNOWN, data_state: NEEDS_INFORMATION, action: RESEARCH}
+  rationale: >-
+    A headline is not evidence, and an absent history is not a negative fact
+    about the person — it is a research task. Rule 5 sets NEEDS_INFORMATION and
+    RESEARCH without lowering attention, guard 6 refuses any quality claim, and
+    the profile stays in the queue as work to do rather than being dismissed.
+  expected_reason: [safety_rule_5_needs_information, guard_6_needs_information_unknown, recall_first_missing_not_negative]
+
+- id: DQ08
+  group: data_quality_adversarial
+  description: "Four Senior Engineer roles with EVERY date field null and no currentness indicators. Titles, levels, durations, industries and sizes present."
+  expected: {attention: REVIEW, potential: UNKNOWN, data_state: PARTIAL, action: HUMAN_REVIEW}
+  rationale: >-
+    Chronology and currentness are gone — two coverage components plus four
+    unresolvable currentness contradictions — so confidence collapses below the
+    operating threshold and no quality band may be asserted. Trajectory is
+    correctly unmeasurable rather than flat: an unmeasured career and a flat
+    career are different things, and only the second is evidence. The history is
+    present and multi-role, so PARTIAL rather than NEEDS_INFORMATION.
+  expected_reason: [guard_5_low_confidence_unknown, guard_4_incomplete_data_floor]
+
+- id: DQ09
+  group: data_quality_adversarial
+  description: >-
+    Head of Product (2018-2020) plus TWO rows describing the same founding —
+    'Co-Founder' and 'Co-Founder & CEO' at the same company with the same start
+    date — with the array in the wrong order.
+  expected: {attention: PRIORITY_REVIEW, potential: HIGH, data_state: SUFFICIENT, action: CONSIDER_ENGAGEMENT}
+  expected_evidence:
+    exceptional_flag: false
+    detectors_not_fired: [repeat_founder]
+    contradictions_include: [OVERLAP]
+    quality_flags_include: [REORDERED]
+  rationale: >-
+    M: the provider's arrays contain the same engagement more than once, and
+    counting ROWS would turn one founding into a repeat founder — a factual
+    claim about a person, manufactured out of a data artefact. Same company plus
+    same start date is ONE founding, so repeat_founder must stay silent. The
+    profile still qualifies as high priority on its own merits via rule 2. The
+    out-of-order array is a provider formatting artefact the normalizer repairs
+    deterministically, so it is a QUALITY flag with no confidence penalty, while
+    the genuinely overlapping duplicate rows are a contradiction that does cost
+    confidence.
+  expected_reason: [A8_explicit_founder_only, A6b_conservative_dedup, safety_rule_2_high_broad_high_conf]
+
+- id: DQ10
+  group: data_quality_adversarial
+  description: "Software Engineer -> Senior Software Engineer, 7y at a 160-person software company; institution recorded as 'M.I.T.'."
+  expected: {attention: ROUTINE, potential: LOW, data_state: SUFFICIENT, action: NO_URGENT_ACTION}
+  expected_evidence:
+    inferences_include: [FUZZY_INSTITUTION_MATCH]
+    signals_positive: [education_signal]
+  rationale: >-
+    The variant must resolve to the tier list — otherwise confidence would
+    measure how well the source punctuates — but the resolution is a JUDGMENT,
+    not a fact the record states, so it carries an inference penalty. Full
+    education credit, slightly reduced confidence, and the rest of the profile
+    is an ordinary complete IC career: LOW, and visible.
+  expected_reason: [A7_unknown_tier_is_neutral, safety_rule_4_low_broad_high_conf]

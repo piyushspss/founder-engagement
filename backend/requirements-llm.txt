@@ -1,0 +1,3 @@
+# OPTIONAL. The core app, the deterministic assessment and the whole eval suite
+# run without this file and without any API key (MockAdapter). See PLAN A11(c).
+anthropic>=0.40

@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+frontend/dist/
+founder.db
+.DS_Store
+
+# Local secrets. NEVER commit a real API key.
+# `.env.example` is the committed placeholder template and is excluded below.
+.env
+.env.*
+!.env.example

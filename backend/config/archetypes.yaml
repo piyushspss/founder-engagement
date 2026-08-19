@@ -1,0 +1,103 @@
+# Archetype definitions — PLAN.md v2.1 §4.4
+#
+# LABELLING LAYER ONLY. Archetypes NEVER change broad_score, confidence,
+# attention, potential, data_state or recommended_action. They select which
+# strong signals and which missing items the UI highlights, and they drive the
+# explanation text. Implemented in Checkpoint 4.
+
+version: "1.0.0"
+
+# Evaluated in order; first archetype whose `requires` are all satisfied wins.
+# If two or more match with comparable evidence -> Hybrid (see hybrid rules).
+archetypes:
+  - name: Repeat Founder
+    description: "Two or more EXPLICIT founder roles (A8). Founder track record is the dominant signal."
+    requires:
+      explicit_founder_roles_min: 2
+    highlights: [founder_evidence, career_trajectory, exceptional_signals]
+    missing_candidates: [healthcare_depth, operating_environment]
+
+  - name: Clinical Expert
+    description: "Licensed/clinical practice background (RN, MD, DO, clinical specialist roles) with health-system experience."
+    requires:
+      any_of:
+        - clinical_degree_in: [MD, DO, RN, BSN]
+        - clinical_role_department_in: [Nursing, Medical, Clinical, Physicians,
+                                       Clinical Operations, Clinical Affairs,
+                                       Patient Care, Pharmacy]
+      health_months_min: 24
+    highlights: [healthcare_depth, education_signal]
+    missing_candidates: [founder_evidence, technical_evidence, operating_environment]
+
+  - name: Scientific Expert
+    description: "Research/science depth: PhD or research-heavy roles in biotech, pharma or research institutions."
+    requires:
+      any_of:
+        - research_degree_in: [PhD]
+        - research_department_in: [Research, Research & Development, Science, Data Science]
+      health_or_science_months_min: 24
+    highlights: [education_signal, healthcare_depth]
+    missing_candidates: [founder_evidence, leadership, operating_environment]
+
+  - name: Healthcare Operator
+    description: "Operating/management roles inside healthcare organizations; runs things rather than builds product or practices clinically."
+    requires:
+      health_months_min: 36
+      management_level_at_least: Manager
+      department_in_any: [Operations, Clinical Operations, Executive, General Management,
+                          Administration, Finance, Strategy]
+    highlights: [healthcare_depth, leadership, operating_environment]
+    missing_candidates: [founder_evidence, technical_evidence]
+
+  - name: Technical Builder
+    description: "Engineering/technical function ownership (Engineering, Data, Platform, Architecture)."
+    requires:
+      department_in: [Engineering, Information Technology, Data, Technology, Architecture]
+    highlights: [career_trajectory, leadership, education_signal]
+    missing_candidates: [founder_evidence, healthcare_depth]
+
+  - name: Product Builder
+    description: "Product management/design ownership; builds and ships products."
+    requires:
+      department_in: [Product, Design, Product Management, User Experience]
+    highlights: [career_trajectory, leadership, operating_environment]
+    missing_candidates: [founder_evidence, healthcare_depth]
+
+  - name: Commercial/GTM
+    description: "Revenue-side ownership: sales, marketing, business development, partnerships."
+    requires:
+      department_in: [Sales, Marketing, Business Development, Partnerships, Growth, Revenue]
+    highlights: [leadership, career_trajectory, operating_environment]
+    missing_candidates: [founder_evidence, healthcare_depth, technical_evidence]
+
+  - name: Hybrid
+    description: "Substantial evidence for two or more archetypes (e.g. clinician who became a product leader). Highlights the union."
+    requires:
+      fallback: true
+    highlights: [healthcare_depth, leadership, career_trajectory]
+    missing_candidates: [founder_evidence]
+
+hybrid:
+  # If >= this many archetypes match on their primary evidence, label Hybrid and
+  # name the constituents in the explanation.
+  min_matching_archetypes: 2
+  # An archetype only counts toward Hybrid if it holds this share of role-months.
+  min_role_month_share: 0.25
+
+# CP4-R4. High-specificity archetypes that take the PRIMARY label instead of
+# being absorbed into Hybrid. Rationale: "Repeat Founder" is a rare, highly
+# specific claim resting on >= 2 explicit founder titles, and it is the single
+# most decision-relevant frame a reviewer can be handed. Before this rule all 22
+# repeat founders in load_800 were relabelled `Hybrid` (because a healthcare
+# founder with an `Executive` department also satisfies Healthcare Operator),
+# so the label could never appear at all.
+#
+# This is EXPLANATION ONLY. Every co-matching archetype is retained in
+# `matched` / `secondary`, and no signal, score, confidence, exceptional flag or
+# policy output depends on it. Hybrid remains the label for every other material
+# multi-archetype combination.
+primary_precedence:
+  - Repeat Founder
+
+unknown_label: Insufficient Evidence
+unknown_note: "No archetype asserted. Assigned when there is no usable experience history. Does NOT lower potential or attention (PLAN §4.5 rule 5)."

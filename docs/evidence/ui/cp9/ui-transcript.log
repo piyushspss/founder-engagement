@@ -1,0 +1,9 @@
+SHOT 01-not-due-day-before
+SHOT 02-due-on-the-date
+SHOT 03-due-kpi-filters-queue
+SHOT 04-reengage-action
+POST http://localhost:5173/founders/021ceb3f-a1ba-4508-89e1-5f8e2feed1da/stage -> 200
+SHOT 05-post-reengage-nurturing
+SHOT 06-audit-after-reengage
+SHOT 07-no-longer-due
+SHOT 08-stuck-and-simulated-dashboard

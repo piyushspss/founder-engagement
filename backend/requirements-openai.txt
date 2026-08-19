@@ -1,0 +1,11 @@
+# OPTIONAL. The core app, the deterministic assessment and the whole eval suite
+# run without this file and without any API key (MockAdapter). See PLAN A11(c).
+#
+# Install only when you intend to make real OpenAI calls:
+#     pip install -r backend/requirements-openai.txt
+#
+# Verified against openai 3.3.1: every parameter the adapter sends
+# (model, instructions, input, max_output_tokens, tools, text, reasoning) is
+# present in `responses.create`, and every response field it reads
+# (model, status, usage.*, output, output_text, incomplete_details) exists.
+openai>=1.60,<4
