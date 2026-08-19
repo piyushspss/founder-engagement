@@ -1,5 +1,5 @@
 # Founder Engagement Workflow — Redesign Health take-home
-# docs/PLAN.md v2.1 (FROZEN) is the source of truth.
+# docs/PLAN.md v2.3 (FROZEN) is the source of truth.
 
 PY_BIN ?= python3.13
 VENV   := .venv

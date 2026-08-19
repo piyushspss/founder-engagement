@@ -8,10 +8,10 @@ This is a **separate evaluation from the CP6 deterministic golden evaluation**. 
 a deterministic number, and no result below was used to tune a weight, threshold, prompt, policy or
 golden case.
 
-Source of truth: [`cp10_2_experiment_manifest.json`](cp10_2_experiment_manifest.json) (frozen
-component hashes) and [`cp10_2_holdout_raw.jsonl`](cp10_2_holdout_raw.jsonl) (30 durable per-case
-records). Design and freeze: [`CP10_2_DESIGN.md`](CP10_2_DESIGN.md). cp10.1 preservation:
-[`CP10_1_PRESERVED.md`](CP10_1_PRESERVED.md).
+Source of truth: [`cp10_2_experiment_manifest.json`](evidence/ai/cp10_2_experiment_manifest.json) (frozen
+component hashes) and [`cp10_2_holdout_raw.jsonl`](evidence/ai/cp10_2_holdout_raw.jsonl) (30 durable per-case
+records). Design and freeze: [`CP10_2_DESIGN.md`](evidence/ai/CP10_2_DESIGN.md). cp10.1 preservation:
+[`CP10_1_PRESERVED.md`](evidence/ai/CP10_1_PRESERVED.md).
 
 Two experiments were run. They are reported separately and are not additive.
 
