@@ -247,8 +247,8 @@ claimed today.
 > **This section is a summary. The canonical, durable record is
 > [`EVAL_REPORT_REAL_PROVIDER.md`](EVAL_REPORT_REAL_PROVIDER.md)** — `make eval`
 > regenerates *this* file end to end and would drop anything appended here. Source of
-> truth for the experiment itself: [`cp10_2_experiment_manifest.json`](cp10_2_experiment_manifest.json)
-> (frozen component hashes) and [`cp10_2_holdout_raw.jsonl`](cp10_2_holdout_raw.jsonl)
+> truth for the experiment itself: [`cp10_2_experiment_manifest.json`](evidence/ai/cp10_2_experiment_manifest.json)
+> (frozen component hashes) and [`cp10_2_holdout_raw.jsonl`](evidence/ai/cp10_2_holdout_raw.jsonl)
 > (30 durable per-case records).
 
 **This is a separate evaluation from the CP6 deterministic golden evaluation above.** No
@@ -271,7 +271,7 @@ into the deterministic exceptional rule, two of them satisfied `2 × MEDIUM → 
 surfaces: **0**.
 
 **Lesson: grounded ≠ notable. Recommendation: C — DO NOT ENABLE cp10.1 attention authority.**
-Preserved in full in [`CP10_1_PRESERVED.md`](CP10_1_PRESERVED.md); cp10.2 improving on it does
+Preserved in full in [`CP10_1_PRESERVED.md`](evidence/ai/CP10_1_PRESERVED.md); cp10.2 improving on it does
 not make it a success.
 
 ## 10.2 cp10.2 — frozen 30-case holdout
@@ -283,7 +283,7 @@ injection variant excluded in code.
 All **25 pre-flight hash checks passed before the first call** and again afterwards; the frozen
 prompt, schema, policy, evaluator and holdout were unchanged throughout. **30 calls attempted,
 27 valid structured responses, 3 malformed, no optional stopping, $0.06137 estimated spend,
-snapshot `gpt-5-mini-2025-08-07`.** Design and freeze: [`CP10_2_DESIGN.md`](CP10_2_DESIGN.md).
+snapshot `gpt-5-mini-2025-08-07`.** Design and freeze: [`CP10_2_DESIGN.md`](evidence/ai/CP10_2_DESIGN.md).
 
 ## 10.3 Safety
 

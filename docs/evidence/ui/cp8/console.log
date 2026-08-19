@@ -1,9 +1,0 @@
-[debug] [vite] connecting...
-[debug] [vite] connected.
-[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[api 409] POST http://localhost:5173/api/founders/021ceb3f-a1ba-4508-89e1-5f8e2feed1da/stage
-[error] Failed to load resource: the server responded with a status of 409 (Conflict)
---- config demo ---
-[debug] [vite] connecting...
-[debug] [vite] connected.
-[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

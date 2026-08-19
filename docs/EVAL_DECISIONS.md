@@ -13,7 +13,7 @@ Weights and thresholds are **never** tuned to make an individual case pass
 |---|---|---|---|---|---|
 | — | — | — | No golden-set runs yet (profiles authored in Checkpoint 6). | — | — |
 | CP4-1 | `test_repeat_founder_archetype_takes_precedence` (my own unit test, not a golden case) | (b) the test assumption was wrong | I assumed a two-time founder is labelled `Repeat Founder`. Under the frozen `archetypes.yaml` a repeat founder **at healthcare companies with an `Executive` department** also satisfies Healthcare Operator, and two material matches trigger the configured Hybrid rule. The config is what it is; my expectation was the thing that was wrong. | Test split in two: one asserting `Repeat Founder` when it is the only material match, one **documenting** the Hybrid absorption. No config changed. | pending reviewer |
-| CP4-2 (SUPERSEDED by CP4-R3 — reviewer ruled `Lead < Manager`; RN now labels `Clinical Expert`) | RN → Clinical Operations supplied profile labels `Hybrid`, not `Clinical Expert` | reported, not resolved | See CP4 oddity O-1 in `CHECKPOINT_LOG.md`. Turns on whether `management_level_at_least: Manager` is evaluated on the coarse ordinal ladder (`Lead` ties `Manager` → Hybrid) or on the leadership `level_scores` ordering (`Lead` 0.42 < `Manager` 0.45 → Clinical Expert). Both ladders exist in the frozen config and disagree. | **No change made.** Implementation reuses the single existing ordinal ladder; the test asserts only the parts not in dispute. Awaiting reviewer decision. | pending reviewer |
+| CP4-2 (SUPERSEDED by CP4-R3 — reviewer ruled `Lead < Manager`; RN now labels `Clinical Expert`) | RN → Clinical Operations supplied profile labels `Hybrid`, not `Clinical Expert` | reported, not resolved | See CP4 oddity O-1, recorded in the CP4 adjudication at the time. Turns on whether `management_level_at_least: Manager` is evaluated on the coarse ordinal ladder (`Lead` ties `Manager` → Hybrid) or on the leadership `level_scores` ordering (`Lead` 0.42 < `Manager` 0.45 → Clinical Expert). Both ladders exist in the frozen config and disagree. | **No change made.** Implementation reuses the single existing ordinal ladder; the test asserts only the parts not in dispute. Awaiting reviewer decision. | pending reviewer |
 | CP4-R1 | `test_not_exceptional_progression_when_cp3_could_not_resolve_the_ladder` | (b) my test assumption was too strong | I had gated the whole detector on the broad `career_trajectory` being observed. The reviewer specified CP3 semantics **per role pair**, which is strictly more precise: an unresolvable pair asserts nothing, but a resolvable pair elsewhere in the same CV is still real evidence. | Split into two tests: all-pairs-unresolvable → silent; unresolvable pair does not silence a resolvable one. | pending reviewer |
 | CP4-R2 | `test_repeat_founder_in_healthcare_is_absorbed_into_hybrid` | (a) implementation violated intended policy | The test documented the Hybrid-absorption behaviour that CP4-R4 corrects. | Replaced with `test_repeat_founder_keeps_the_primary_label_and_retains_co_matches`. | pending reviewer |
 
@@ -190,9 +190,9 @@ relation, archetype membership).
 Consequently there is **no `(a)` entry and no `(b)` entry to make**. No code was changed. No
 expectation was changed after the freeze. No weight, threshold (30 / 40 / 65 / 0.6), detector
 parameter or tier list was touched — the rubric hash is `41bffa7056f4` both before and after the
-evaluation, and the only files modified during CP6 are `CHECKPOINT_LOG.md`, `EVAL_DECISIONS.md`,
-`EVAL_REPORT.md`, `data/golden/cases.yaml`, `data/golden/profiles.json`, `scripts/author_golden.py`
-and `scripts/eval.py`.
+evaluation, and the only files modified during CP6 are the checkpoint log kept at the time (not
+carried into this submission), `EVAL_DECISIONS.md`, `EVAL_REPORT.md`, `data/golden/cases.yaml`,
+`data/golden/profiles.json`, `scripts/author_golden.py` and `scripts/eval.py`.
 
 ### CP6-1 — one change WAS made during CP6, to the measuring instrument (not the system)
 
@@ -282,9 +282,10 @@ sampling); real-provider results are exploratory and are labelled as such.
 
 ## CP8 / CP9 — presentation and workflow decisions (no scoring change)
 
-Recorded here for completeness; the full narrative is in `CHECKPOINT_LOG.md`. Neither checkpoint
-touched a weight, threshold, detector, archetype, coverage sub-component, normalization rule or
-golden expectation, and both reproduced the CP6 default evaluation exactly.
+Recorded here for completeness; the full narrative was recorded in the CP8 and CP9 checkpoint
+reviews at the time. Neither checkpoint touched a weight, threshold, detector, archetype,
+coverage sub-component, normalization rule or golden expectation, and both reproduced the CP6
+default evaluation exactly.
 
 | id | decision | classification | reasoning |
 |---|---|---|---|
@@ -396,7 +397,7 @@ The cp10.1 prompt text, `PROMPT_VERSION`, `prompt_sha256()`
 aggregation rule (`overlay.py`), service and evaluation script are **byte-unchanged**.
 The five-call real-provider run remains the **development / discovery** set and its
 recommendation remains **C — DO NOT ENABLE**. No checkpoint record has been rewritten to
-imply otherwise; `docs/CP10_1_PRESERVED.md` records the freeze, the plan, the outcome and
+imply otherwise; `docs/evidence/ai/CP10_1_PRESERVED.md` records the freeze, the plan, the outcome and
 one honest gap (the per-call stdout was never written to a file and is not in the repo).
 
 **CP10.2-2 — the observed failure was a scale mismatch, and the response is architectural,
@@ -422,7 +423,7 @@ golden hashes `6e128c9d…` / `8de59bea…` and effective rubric `4714815e…` u
 `10d0bbe12e8b0ce4b92fd644718ce6f0bf314f9a61588742ea0e6ca77c7000dd`, asserted by test and
 re-checked by the evaluator, which aborts before any paid call on a mismatch. The 30-case
 holdout, its deterministic redistribution rule and the success criteria were all declared
-before the first real cp10.2 call. Details in `docs/CP10_2_DESIGN.md`.
+before the first real cp10.2 call. Details in `docs/evidence/ai/CP10_2_DESIGN.md`.
 
 **CP10.2-5 — evaluation-governance amendment, accepted before any paid call.** No frozen
 component changed: prompt, prompt semantics, schema semantics, contextual policy,
@@ -436,7 +437,7 @@ citations, fact groups and both verdicts are retained so they can be independent
 overturned; (ii) the numeric success criteria are frozen (≥11/13 controls un-escalated,
 ≥3 headroom cases with USEFUL_CONTEXTUAL findings, ≥2 JUSTIFIED escalations among them,
 ≤2 FALSE_POSITIVE escalations, JUSTIFIED > FALSE_POSITIVE) as **evaluation criteria
-only**, wired into no scoring path; (iii) `docs/cp10_2_experiment_manifest.json` freezes
+only**, wired into no scoring path; (iii) `docs/evidence/ai/cp10_2_experiment_manifest.json` freezes
 the whole experiment rather than just the prompt, and the evaluator aborts before
 spending if any of the nine hashed components has moved; (iv) F-23 is retained verbatim —
 grounding validates *provenance integrity*, not semantic entailment for arbitrary
@@ -457,8 +458,8 @@ same holdout.
 Appended after both real-provider experiments completed. Prior entries are unchanged and remain
 statements of what was true when written. Evidence:
 [`EVAL_REPORT_REAL_PROVIDER.md`](EVAL_REPORT_REAL_PROVIDER.md),
-[`cp10_2_experiment_manifest.json`](cp10_2_experiment_manifest.json),
-[`cp10_2_holdout_raw.jsonl`](cp10_2_holdout_raw.jsonl).
+[`cp10_2_experiment_manifest.json`](evidence/ai/cp10_2_experiment_manifest.json),
+[`cp10_2_holdout_raw.jsonl`](evidence/ai/cp10_2_holdout_raw.jsonl).
 
 **RP-1 — cp10.1: do not enable AI attention authority.**
 

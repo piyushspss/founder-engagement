@@ -31,11 +31,19 @@ All long-form documentation lives in [`docs/`](docs/). Suggested reading order:
 
 Deeper evaluation and audit material, if you want it:
 
+- [Real-provider LLM evaluation](docs/EVAL_REPORT_REAL_PROVIDER.md) — the canonical, durable record
+  of the two post-CP11 OpenAI experiments. `docs/EVAL_REPORT.md` §10 is only a summary of it, and
+  `make eval` rewrites that file end to end.
 - [Evaluation decisions](docs/EVAL_DECISIONS.md) — every adjudicated evaluation/policy decision,
   including each accepted finding and each case deliberately left failing.
-- [Engineering checkpoint log](docs/CHECKPOINT_LOG.md) — optional build/audit trail, appended once
-  per checkpoint.
-- [Build runbook](docs/BUILD_RUNBOOK.md) — the frozen checkpoint sequence the build followed.
+- [`docs/evidence/ai/`](docs/evidence/ai/) — the cp10.1 preservation record
+  ([`CP10_1_PRESERVED.md`](docs/evidence/ai/CP10_1_PRESERVED.md)), the frozen cp10.2 design
+  ([`CP10_2_DESIGN.md`](docs/evidence/ai/CP10_2_DESIGN.md)), the frozen experiment manifest
+  ([`cp10_2_experiment_manifest.json`](docs/evidence/ai/cp10_2_experiment_manifest.json)) and the
+  30 durable per-case holdout records
+  ([`cp10_2_holdout_raw.jsonl`](docs/evidence/ai/cp10_2_holdout_raw.jsonl)).
+- [`docs/evidence/ui/`](docs/evidence/ui/) — a curated set of captured UI screenshots: the
+  priority queue and founder detail (CP8), and keep-warm resurfacing (CP9).
 
 ---
 
@@ -94,10 +102,12 @@ whose output we can currently validate the least.
 > code and is what the evaluation tested — should stay unused until human reviewer labels justify
 > it. Deterministic assessment remains the prioritization authority.
 > Full evidence: [`docs/EVAL_REPORT_REAL_PROVIDER.md`](docs/EVAL_REPORT_REAL_PROVIDER.md) ·
-> [`docs/CP10_1_PRESERVED.md`](docs/CP10_1_PRESERVED.md) ·
-> [`docs/CP10_2_DESIGN.md`](docs/CP10_2_DESIGN.md) ·
-> frozen manifest [`docs/cp10_2_experiment_manifest.json`](docs/cp10_2_experiment_manifest.json) ·
-> audit evidence [`docs/cp10_2_holdout_raw.jsonl`](docs/cp10_2_holdout_raw.jsonl).
+> [`docs/evidence/ai/CP10_1_PRESERVED.md`](docs/evidence/ai/CP10_1_PRESERVED.md) ·
+> [`docs/evidence/ai/CP10_2_DESIGN.md`](docs/evidence/ai/CP10_2_DESIGN.md) ·
+> frozen manifest
+> [`docs/evidence/ai/cp10_2_experiment_manifest.json`](docs/evidence/ai/cp10_2_experiment_manifest.json) ·
+> audit evidence
+> [`docs/evidence/ai/cp10_2_holdout_raw.jsonl`](docs/evidence/ai/cp10_2_holdout_raw.jsonl).
 >
 > **Rules prioritize. AI notices. Humans interpret.**
 
@@ -116,7 +126,7 @@ whose output we can currently validate the least.
 ```bash
 make setup   # venv + backend deps + npm install
 make data    # OPTIONAL — regenerate the 800-profile synthetic load population (seeded)
-make test    # backend pytest                                     → 1634 tests
+make test    # backend pytest                                     → 1688 tests
 make eval    # deterministic golden-set evaluation + AI ablation   → rewrites docs/EVAL_REPORT.md
 make seed    # build SQLite (founder.db) from the load population
 make api     # FastAPI on :8000        (long-running — own terminal)
@@ -171,8 +181,9 @@ cp .env.example .env      # then edit .env; never commit it
 make env-check            # prints provider + availability, never a key value
 ```
 
-`make api` and `make ai-openai` source `.env` if it exists. Exporting the variables in your shell
-works identically — nothing in the app reads a file directly, only the environment.
+`make api`, `make env-check` and the three `make ai-*` targets source `.env` if it exists.
+Exporting the variables in your shell works identically — nothing in the app reads a file
+directly, only the environment.
 
 ```bash
 pip install -r backend/requirements-openai.txt
@@ -215,8 +226,11 @@ backend/config/          weights.yaml, tiers/*.json, archetypes.yaml  — config
 data/raw/                sample.json (provided dataset, 2 profiles)
 data/synthetic/          load_800.json (demo population; tagged _synthetic)
 data/golden/             cases.yaml (hand-authored eval intent) + profiles.json (CP6)
-docs/                    PLAN, PRESENTATION, EVAL_REPORT, EVAL_DECISIONS, CHECKPOINT_LOG
-docs/cp8 cp9 cp10/       per-checkpoint evidence captures
+docs/                    PLAN, PRESENTATION, EVAL_REPORT, EVAL_REPORT_REAL_PROVIDER,
+                         EVAL_DECISIONS
+docs/evidence/ui/        curated UI screenshots — cp8 (queue, assessment, decision),
+                         cp9 (keep-warm resurfacing)
+docs/evidence/ai/        cp10.1 preservation, cp10.2 design, frozen manifest, holdout records
 ```
 
 ---
@@ -240,10 +254,12 @@ docs/cp8 cp9 cp10/       per-checkpoint evidence captures
 ## API
 
 ```
+GET    /health                          liveness
 POST   /import                          JSON or CSV -> normalize -> dedup -> assess -> store
 POST   /rescore                         re-run the pipeline under the effective config
 GET    /config    PUT /config           read / change the effective rubric (PUT never rescores)
 GET    /queue                           filters: attention, data_state, stage, owner, due, as_of
+GET    /founders                        unfiltered listing
 GET    /founders/{id}                   facts | assessment | metadata | decision | workflow | dups
 GET    /dashboard                       stage counts, weekly intake, ageing, stuck, due, low-conf %
 GET    /audit/{id}                      who changed what, when, why
@@ -298,10 +314,11 @@ Nothing calls it for you: not import, not the queue, not rescore, not the dashbo
 GET. Cost, latency and human intent all stay visible.
 
 * **Adapters** — `MockAdapter` (deterministic, `provider="mock"`, finds nothing by default),
-  `AnthropicAdapter` (`claude-opus-5`) and `OpenAIAdapter` (`gpt-5-mini` by default, overridable
-  with `OPENAI_MODEL`). Both real SDKs are imported lazily, and all three normalise to the same
-  internal result contract, so grounding, safety policy, the raise-only overlay and the persistence
-  boundary are identical whichever provider is configured. Provider-side structured output does
+  `AnthropicAdapter` (`claude-opus-5` by default, overridable with `ANTHROPIC_MODEL`) and
+  `OpenAIAdapter` (`gpt-5-mini` by default, overridable with `OPENAI_MODEL`). Both real SDKs are
+  imported lazily, and all three normalise to the same internal result contract, so grounding,
+  safety policy, the raise-only overlay and the persistence boundary are identical whichever
+  provider is configured. Provider-side structured output does
   **not** replace application validation — every response is re-validated here regardless.
 * **Data minimisation** — every identity hash (email, LinkedIn, phone, github, crunchbase, name,
   `mdm_person_id`) is withheld. No web search, no enrichment, no outside knowledge.
@@ -369,7 +386,8 @@ Three screens, React + Vite + Tailwind, hash-routed, no state library.
 * **S3 Pipeline & Dashboard** — Kanban by stage with explicit, reason-carrying moves; weekly
   metrics; a config drawer for weights, thresholds, tier lists and the health taxonomy.
 
-Presentation rules the UI is tested against (`frontend/src/screens/parts/boundary.test.tsx`):
+Presentation rules the UI is tested against (`frontend/src/screens/parts/boundary.test.tsx`,
+with `ai-evidence.test.tsx` and `resurfacing.test.tsx` alongside it — 34 tests in total):
 
 * `UNKNOWN` is an **unmade judgment**, never a worse `LOW`. Different chip, different copy
   ("insufficient evidence to judge" vs "sufficient evidence, limited positive signals"), never red,
@@ -406,8 +424,9 @@ AI-layer screenshot or output is labelled with its provider (`mock` vs `anthropi
 
 ## Evaluation summary
 
-Full detail in [`docs/EVAL_REPORT.md`](docs/EVAL_REPORT.md); methodology and every adjudicated
-decision in [`docs/EVAL_DECISIONS.md`](docs/EVAL_DECISIONS.md).
+Full detail in [`docs/EVAL_REPORT.md`](docs/EVAL_REPORT.md) (regenerated end to end by
+`make eval`); methodology and every adjudicated decision in
+[`docs/EVAL_DECISIONS.md`](docs/EVAL_DECISIONS.md).
 
 | metric | value |
 |---|---|
@@ -515,9 +534,12 @@ so), **F-20** (future-dated stuck counts are fixture-time artifacts), **F-21**
 ## Status
 
 Checkpoints 1–11 complete. Checkpoint 11 was the final validation, documentation and presentation
-pass: no product capability was added, no weight, threshold, golden case or prompt was changed.
-Final numbers: **1536 backend tests · 34 frontend tests · frontend build passing · golden evaluation
-50/50, recall 1.000, ROUTINE leakage 0 · effective rubric hash
+pass: no product capability was added, no weight, threshold, golden case or prompt was changed. The
+OpenAI adapter and the two real-provider experiments (cp10.1 discovery, cp10.2 frozen holdout) came
+after CP11 and likewise changed no deterministic number.
+
+Final numbers: **1688 backend tests passing · 34 frontend tests · frontend build passing · golden
+evaluation 50/50, recall 1.000, ROUTINE leakage 0 · effective rubric hash
 `4714815e84e4c2caa9f0795f3dbf16101d88378200c416ae2184d1a1515d18aa` (frozen default)**. See
-[`docs/CHECKPOINT_LOG.md`](docs/CHECKPOINT_LOG.md) for the full history and
+[`docs/EVAL_DECISIONS.md`](docs/EVAL_DECISIONS.md) for the adjudication history and
 [`docs/PRESENTATION.md`](docs/PRESENTATION.md) for the demo.
